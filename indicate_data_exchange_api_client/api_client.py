@@ -26,11 +26,11 @@ from urllib.parse import quote
 from typing import Tuple, Optional, List, Dict, Union
 from pydantic import SecretStr
 
-from indicate_data_exchange_client.configuration import Configuration
-from indicate_data_exchange_client.api_response import ApiResponse, T as ApiResponseT
-import indicate_data_exchange_client.models
-from indicate_data_exchange_client import rest
-from indicate_data_exchange_client.exceptions import (
+from indicate_data_exchange_api_client.configuration import Configuration
+from indicate_data_exchange_api_client.api_response import ApiResponse, T as ApiResponseT
+import indicate_data_exchange_api_client.models
+from indicate_data_exchange_api_client import rest
+from indicate_data_exchange_api_client.exceptions import (
     ApiValueError,
     ApiException,
     BadRequestException,
@@ -455,7 +455,7 @@ class ApiClient:
             if klass in self.NATIVE_TYPES_MAPPING:
                 klass = self.NATIVE_TYPES_MAPPING[klass]
             else:
-                klass = getattr(indicate_data_exchange_client.models, klass)
+                klass = getattr(indicate_data_exchange_api_client.models, klass)
 
         if klass in self.PRIMITIVE_TYPES:
             return self.__deserialize_primitive(data, klass)

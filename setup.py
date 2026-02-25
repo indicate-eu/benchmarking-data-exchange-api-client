@@ -18,7 +18,7 @@ from setuptools import setup, find_packages  # noqa: H301
 #
 # prerequisite: setuptools
 # http://pypi.python.org/pypi/setuptools
-NAME = "indicate-data-exchange-client"
+NAME = "indicate-data-exchange-api-client"
 VERSION = "1.0.0"
 PYTHON_REQUIRES = ">= 3.9"
 REQUIRES = [
@@ -43,5 +43,5 @@ setup(
     long_description="""\
     API for exchanging aggregated quality indicator results between INDICATE data providers and the INDICATE hub.  The API has two operations: one for uploading aggregated quality indicator results from a data provider to the hub and one for querying aggregated quality indicator results across all providers. The second operation is intended for use by data providers as well as authorized 3rd-party users. 
     """,  # noqa: E501
-    package_data={"indicate_data_exchange_client": ["py.typed"]},
+    package_data={"indicate_data_exchange_api_client": ["py.typed"]},
 )

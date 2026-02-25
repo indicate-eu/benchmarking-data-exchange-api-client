@@ -20,7 +20,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Any, ClassVar, Dict, List, Optional
 from typing_extensions import Annotated
-from indicate_data_exchange_client.models.aggregated_quality_indicator_result import AggregatedQualityIndicatorResult
+from indicate_data_exchange_api_client.models.aggregated_quality_indicator_result import AggregatedQualityIndicatorResult
 from typing import Optional, Set
 from typing_extensions import Self
 

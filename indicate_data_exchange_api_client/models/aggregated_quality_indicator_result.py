@@ -21,7 +21,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt
 from typing import Any, ClassVar, Dict, List, Union
 from typing_extensions import Annotated
-from indicate_data_exchange_client.models.aggregation_period_kind import AggregationPeriodKind
+from indicate_data_exchange_api_client.models.aggregation_period_kind import AggregationPeriodKind
 from typing import Optional, Set
 from typing_extensions import Self
 
