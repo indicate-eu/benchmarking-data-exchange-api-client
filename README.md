@@ -8,14 +8,6 @@ This library implements the client part of the INDICATE data exchange protocol w
 
 * API-level access to the INDICATE Hub which provides the server part
 
-## Installation
-
-To run the server, please execute the following from the root directory:
-
-```bash
-pip3 install -r requirements.txt
-```
-
 ## Usage
 
 This library can be used in applications such as the INDICATE quality indicator dashboard and the INDICATE data exchange client for data providers.
