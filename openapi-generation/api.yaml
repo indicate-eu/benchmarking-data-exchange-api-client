@@ -1,0 +1,278 @@
+openapi: 3.0.0
+
+info:
+  title: INDICATE Data Exchange API
+  version: 1.0.0
+  description: |
+    API for exchanging aggregated quality indicator results between
+    INDICATE data providers and the INDICATE hub.
+
+    The API has two operations: one for uploading aggregated quality
+    indicator results from a data provider to the hub and one for
+    querying aggregated quality indicator results across all
+    providers. The second operation is intended for use by data
+    providers as well as authorized 3rd-party users.
+
+components:
+  schemas:
+
+    # General schemas
+
+    IndicatorId:
+      type: integer
+      minimum: 2000000101
+      description: |
+        The numeric ID of the OMOP Concept assigned by the
+        INDICATE project for identifying the particular quality
+        indicator.
+
+    ProviderId:
+      type: string
+      pattern: '[0-9a-f]{8,8}-[0-9a-f]{4,4}-[0-9a-f]{4,4}-[0-9a-f]{4,4}-[0-9a-f]{8,8}'
+      description: |
+        Unique ID of a data provider as a 16-byte UUID rendered as a
+        36-character string.
+
+    # Schemas related to indicator definitions
+
+    IndicatorInfo:
+      type: object
+      required:
+        - concept_id
+        - title
+        - description
+      properties:
+        concept_id:
+          $ref: '#/components/schemas/IndicatorId'
+        title:
+          type: string
+          description: |
+            The title of the quality indicator. Can be multiple words.
+        description:
+          type: string
+          description: |
+            A short description of the quality indicator. Typically a
+            single paragraph.
+
+    # Schemas related to indicator results
+
+    AggregationPeriodKind:
+      type: string
+      enum:
+        - daily
+        - weekly
+        - monthly
+        - yearly
+      description: |
+        The kind, in particular length, of aggregation period for a
+        single aggregated quality indicator value.
+
+    AggregatedQualityIndicatorValue:
+      type: object
+      required:
+        - aggregation_period_start
+        - indicator_id
+        - average_value
+        - observation_count
+      properties:
+        aggregation_period_start:
+          type: string
+          format: date-time
+          description: |
+            The start point in time of the period to which the
+            aggregated quality indicator value pertains.
+
+            The length or end point of the period is either encoded in
+            an adjacent property or evident from the context.
+        indicator_id:
+          $ref: '#/components/schemas/IndicatorId'
+        average_value:
+          type: number
+          format: double
+          description: |
+            The value of the quality indicator for the indicated
+            period.
+
+            The value is a non-negative real number. The value 0
+            indicates no conformance at all for the period in question
+            while positive number, typically up to 1, indicate some or
+            full conformance.
+        observation_count:
+          type: integer
+          minimum: 1
+          description: |
+            The number of quality indicator results the data provider
+            used to produce the aggregated (average) value.
+
+    AggregatedQualityIndicatorResult:
+      description: |
+        A aggregated quality indicator value with a description of the
+        aggregation period.
+
+        This type can be used when aggregated quality indicator
+        results are uploaded from a data provider to the hub so that
+        the provider id is evident from the context.
+      allOf:
+        - $ref: '#/components/schemas/AggregatedQualityIndicatorValue'
+        - type: object
+          required:
+            - aggregation_period_kind
+          properties:
+            aggregation_period_kind:
+              $ref: '#/components/schemas/AggregationPeriodKind'
+
+    AttributedQualityIndicatorResult:
+      allOf:
+        - $ref: '#/components/schemas/AggregatedQualityIndicatorValue'
+        - type: object
+          required:
+            - provider_id
+          properties:
+            provider_id:
+              $ref: '#/components/schemas/ProviderId'
+
+  responses:
+
+    BadRequest:
+      description: |
+        Bad Request - Invalid data or missing required fields
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                description: Error message
+
+    InternalServerError:
+      description: |
+        Internal Server Error - Unexpected error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                description: Error message
+
+paths:
+  /indicator-info:
+    get:
+      summary: |
+        Retrieve information such as OMOP Concept ID and a textual
+        description about all defined quality indicators.
+      responses:
+        '200':
+          description: |
+            Return to valid query which contains a of information
+            elements for all defined indicators.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IndicatorInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /results:
+    get:
+      summary: |
+        Retrieve aggregated quality indicator results without
+        identifying information except pseudonymous data providers
+        ids.
+
+        A data provider should be able to recognize the data it
+        uploaded earlier based on the provider id.
+
+        The request must specify an aggregation kind and only results
+        aggregated according to the selected aggregation kind will be
+        returned.
+
+        The request can be restricted to a certain time period but the
+        corresponding parameters are optional. If they are not
+        supplied, all data is returned.
+      parameters:
+        - name: aggregation_kind
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/AggregationPeriodKind'
+          description: |
+            This required parameter control from which aggregation
+            kind the returned data is taken.
+        - name: period_start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: period_end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        # TODO(moringenj): maybe one more parameter - indicator_id:
+      responses:
+        '200':
+          description: |
+            Response to valid query which contains the aggregated
+            quality indicator results for the requested aggregation
+            kind and time period.
+          content:
+            application/json:
+              # TODO(moringenj): alternative design:
+              # [
+              #   { "indicator": "q1",
+              #     "providers": [
+              #       { "provider": "p1", "data": [ {"time": ..., "value": ...}, ... ]},
+              #       { "provider": "p2", "data": [ {"time": ..., "value": ...}, ... ]},
+              #       ...
+              #     ]
+              #   },
+              #   ...
+              # ]
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttributedQualityIndicatorResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /provider-results:
+    post:
+      summary: |
+        Upload aggregated quality indicator results from one data
+        provider to the hub.
+
+        Each invocation of this operation uploads the entirety of the
+        aggregated indicator result data that the data provider has
+        produced so far. The intention is that the hub replaces all
+        data for that data provider with each invocation of this
+        operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # TODO(moringenj): should we do this as an parameter with "in: path"?
+                provider_id:
+                  $ref: '#/components/schemas/ProviderId'
+                results:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AggregatedQualityIndicatorResult'
+      responses:
+        '200':
+          description: Successfully uploaded data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
