@@ -8,6 +8,7 @@
 
 README.md
 setup.cfg
+setup.py
 requirements.txt
 test-requirements.txt
 pyproject.toml
