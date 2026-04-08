@@ -60,6 +60,9 @@ class Hub:
     @staticmethod
     def from_configuration(configuration: Configuration):
         url = str(configuration.endpoint)
+        # Strip trailing / if necessary since the generated API client expects the base path to not contain it.
+        if url.endswith('/'):
+            url = url[:-1]
         if configuration.tenant_id is not None:
             return AzureHub(url,
                             tenant_id=configuration.tenant_id,
