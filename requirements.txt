@@ -2,3 +2,4 @@ typing-extensions
 python_dateutil >= 2.8.2
 pydantic >= 2
 requests >= 2.33.1
+msal
