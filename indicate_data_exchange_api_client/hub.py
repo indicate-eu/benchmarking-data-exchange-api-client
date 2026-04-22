@@ -1,6 +1,7 @@
 import copy
 import logging
 from abc import abstractmethod, ABC
+from datetime import datetime, UTC
 from typing import Optional
 
 import requests
@@ -10,7 +11,6 @@ from pydantic_core import Url
 import indicate_data_exchange_api_client
 from indicate_data_exchange_api_client import ApiClient, DefaultApi
 from indicate_data_exchange_api_client.exceptions import UnauthorizedException, ForbiddenException
-
 
 logger = logging.getLogger("hub")
 
@@ -30,7 +30,8 @@ class Configuration(BaseModel):
     # Certificate-based authentication
     cert_thumbprint: Optional[str] = Field(None, description="Thumbprint of the certificate that is used as the client credential.")
     cert_key: Optional[str] = Field(None, description="Private key material of the certificate that is used as the client credential. ")
-
+    # Accountability
+    site_id: Optional[str] = Field(None, description="Data provider ID for use in provenance headers.")
 
 class Hub(ABC):
     """
@@ -72,29 +73,23 @@ class Hub(ABC):
             and configuration.apim_app_id is None):
             return SimpleHub(url)
         else:
-            def check_options(options: list[str]):
+            kwargs = dict()
+            def process_options(options: list[str], required: bool = False):
                 for option in options:
                     value = getattr(configuration, option)
-                    if value is None:
+                    if required and value is None:
                         raise RuntimeError(f"Missing configuration option: {option}")
+                    kwargs[option] = value
+            process_options([ 'tenant_id', 'sp_client_id', 'apim_app_id', 'site_id' ])
+            # process_options([ 'pipeline_run_id', 'profile_id' ], required=False)
 
-            check_options([ 'tenant_id', 'sp_client_id', 'apim_app_id' ])
             if (configuration.cert_thumbprint is None
                 and configuration.cert_key is None):
-                check_options([ 'sp_client_secret' ])
-                return AzureHubWithSecret(url,
-                                          tenant_id=configuration.tenant_id,
-                                          sp_client_id=configuration.sp_client_id,
-                                          apim_app_id=configuration.apim_app_id,
-                                          sp_client_secret=configuration.sp_client_secret)
+                process_options([ 'sp_client_secret' ])
+                return AzureHubWithSecret(url, **kwargs)
             else:
-                check_options([ 'cert_thumbprint', 'cert_key' ])
-                return AzureHubWithCertificate(url,
-                                               tenant_id=configuration.tenant_id,
-                                               sp_client_id=configuration.sp_client_id,
-                                               apim_app_id=configuration.apim_app_id,
-                                               cert_thumbprint=configuration.cert_thumbprint,
-                                               cert_key=configuration.cert_key)
+                process_options([ 'cert_thumbprint', 'cert_key' ])
+                return AzureHubWithCertificate(url, **kwargs)
 
 
 class SimpleHub(Hub):
@@ -114,13 +109,24 @@ class AzureHub(Hub, ABC):
     the request in question failed due to an authorization issue.
     """
 
-    def __init__(self, endpoint: str, tenant_id: str, sp_client_id: str, apim_app_id: str):
+    def __init__(self,
+                 endpoint: str,
+                 tenant_id: str,
+                 sp_client_id: str,
+                 apim_app_id: str,
+                 site_id: str,
+                 pipeline_run_id: Optional[str] = None,
+                 profile_id: Optional[str] = None):
         super().__init__(endpoint)
         # Store data for the authentication flow.
         self._tenant_id    = tenant_id
         self._sp_client_id = sp_client_id
         self._apim_app_id  = apim_app_id
         self._access_token = None
+        # Store data for accountability layer.
+        self._site_id         = site_id
+        self._pipeline_run_id = pipeline_run_id
+        self._profile_id_id   = profile_id
         # Wrap methods such that an Authorization header is added and (re-)authentication is performed when needed,
         # potentially in combination with retrying the request.
         for name in ['indicator_info', 'results', 'provider_results']:
@@ -129,9 +135,7 @@ class AzureHub(Hub, ABC):
             def new_method(*args, _headers = None, _name=name, _old=old_method, **kwargs):
                 def call():
                     # Augment headers with an Authorization header which contains the access token.
-                    access_token = self.access_token
-                    effective_headers = copy.copy(_headers) if _headers is not None else dict()
-                    effective_headers['Authorization'] = f"Bearer {access_token}"
+                    effective_headers = self._augment_headers(copy.copy(_headers) if _headers is not None else dict())
                     effective_kwargs = copy.copy(kwargs)
                     if '_headers' in effective_kwargs:
                         del effective_kwargs['_headers']
@@ -147,6 +151,24 @@ class AzureHub(Hub, ABC):
                     self._access_token = None
                     return call()
             setattr(self, name, new_method)
+
+    def _augment_headers(self, headers: dict):
+        # Add Authorization header
+        access_token = self.access_token
+        headers['Authorization'] = f"Bearer {access_token}"
+        # Add provenance headers (Document AP-AUTH-001, Section 5.2
+        # Accountability Layer)
+        prefix = 'X-INDICATE'
+        def add_provenance_header(name, value):
+            headers[f"{prefix}-{name}"] = value
+        add_provenance_header('Timestamp', datetime.now(UTC).isoformat())
+        add_provenance_header('Site-ID', self._site_id)
+        if self._pipeline_run_id is not None:
+            add_provenance_header('Pipeline-Run-ID', self._pipeline_run_id)
+        if self._profile_id_id is not None:
+            add_provenance_header('Profile-ID', self._profile_id_id)
+
+        return headers
 
     @property
     def access_token(self):
