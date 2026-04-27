@@ -32,6 +32,8 @@ class Configuration(BaseModel):
     cert_key: Optional[str] = Field(None, description="Private key material of the certificate that is used as the client credential. ")
     # Accountability
     site_id: Optional[str] = Field(None, description="Data provider ID for use in provenance headers.")
+    profile_id: Optional[str] = Field(None, description="Benchmarking profile ID for use in provenance headers.")
+    pipeline_run_id: Optional[str] = Field(None, description="Benchmarking run ID for use in provenance headers.")
 
 class Hub(ABC):
     """
@@ -81,7 +83,7 @@ class Hub(ABC):
                         raise RuntimeError(f"Missing configuration option: {option}")
                     kwargs[option] = value
             process_options([ 'tenant_id', 'sp_client_id', 'apim_app_id', 'site_id' ])
-            # process_options([ 'pipeline_run_id', 'profile_id' ], required=False)
+            process_options([ 'pipeline_run_id', 'profile_id' ], required=False)
 
             if (configuration.cert_thumbprint is None
                 and configuration.cert_key is None):
@@ -115,8 +117,8 @@ class AzureHub(Hub, ABC):
                  sp_client_id: str,
                  apim_app_id: str,
                  site_id: str,
-                 pipeline_run_id: Optional[str] = None,
-                 profile_id: Optional[str] = None):
+                 profile_id: Optional[str] = None,
+                 pipeline_run_id: Optional[str] = None):
         super().__init__(endpoint)
         # Store data for the authentication flow.
         self._tenant_id    = tenant_id
@@ -125,8 +127,8 @@ class AzureHub(Hub, ABC):
         self._access_token = None
         # Store data for accountability layer.
         self._site_id         = site_id
-        self._pipeline_run_id = pipeline_run_id
         self._profile_id_id   = profile_id
+        self._pipeline_run_id = pipeline_run_id
         # Wrap methods such that an Authorization header is added and (re-)authentication is performed when needed,
         # potentially in combination with retrying the request.
         for name in ['indicator_info', 'results', 'provider_results']:
